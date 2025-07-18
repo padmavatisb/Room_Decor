@@ -11,6 +11,18 @@ function App() {
 
   let scene, camera, renderer;
 
+    const onClicked = (e, selectItem, index) => {
+    itemSelectedIndex = index;
+
+    // remove image selection from others to indicate unclicked
+    for (let i = 0; i < models.length; i++) {
+      const el = document.querySelector(`#item` + i);
+      el.classList.remove("clicked");
+    }
+    // set image to selected
+    e.target.classList.add("clicked");
+  };
+
   let models = [
     "./dylan_armchair_yolk_yellow.glb",
     "./ivan_armchair_mineral_blue.glb",
@@ -18,8 +30,12 @@ function App() {
     "./flippa_functional_coffee_table_w._storagewalnut.glb",
     "./frame_armchairpetrol_velvet_with_gold_frame.glb",
     "./elnaz_nesting_side_tables_brass__green_marble.glb",
+    "Standing_lamp.glb",
+    "Dining_Set.glb",
+    "Little_Bookcase.glb",
+    "Plant_Decor.glb"
   ];
-  let modelScaleFactor = [0.01, 0.01, 0.005, 0.01, 0.01, 0.01];
+  let modelScaleFactor = [0.01, 0.01, 0.005, 0.01, 0.01, 0.01, 0.01,0.01,0.01];
   let items = [];
   let itemSelectedIndex = 0;
 
@@ -123,17 +139,17 @@ function App() {
     }
   }
 
-  const onClicked = (e, selectItem, index) => {
-    itemSelectedIndex = index;
+  // const onClicked = (e, selectItem, index) => {
+  //   itemSelectedIndex = index;
 
-    // remove image selection from others to indicate unclicked
-    for (let i = 0; i < models.length; i++) {
-      const el = document.querySelector(`#item` + i);
-      el.classList.remove("clicked");
-    }
-    // set image to selected
-    e.target.classList.add("clicked");
-  };
+  //   // remove image selection from others to indicate unclicked
+  //   for (let i = 0; i < models.length; i++) {
+  //     const el = document.querySelector(`#item` + i);
+  //     el.classList.remove("clicked");
+  //   }
+  //   // set image to selected
+  //   e.target.classList.add("clicked");
+  // };
 
   function setupFurnitureSelection() {
     for (let i = 0; i < models.length; i++) {
