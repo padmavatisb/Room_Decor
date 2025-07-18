@@ -1,13 +1,13 @@
 # Room_Decor
 <div align="center" id="top"> 
-  <img src="./.github/app.gif" alt="3D WebXR Furniture" />
+  <img src="./.github/app.gif" alt="ROOM Decor" />
 
-<a href="https://padmavatisb-arroomdecor.netlify.app//">Demo</a>
+<a href="https://roomdecorpadma.netlify.app//">Demo</a>
 
 
 </div>
 
-<h1 align="center">3D WebXR Furniture</h1>
+<h1 align="center">AR Room Decor </h1>
 
 <p align="center">
 
