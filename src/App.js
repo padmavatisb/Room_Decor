@@ -35,7 +35,7 @@ function App() {
     "Little_Bookcase.glb",
     "Plant_Decor.glb"
   ];
-  let modelScaleFactor = [0.01, 0.01, 0.005, 0.01, 0.01, 0.01, 0.01,0.01,0.01];
+  let modelScaleFactor = [0.01, 0.01, 0.005, 0.01, 0.01, 0.1, 0.1,0.1,0.1];
   let items = [];
   let itemSelectedIndex = 0;
 
