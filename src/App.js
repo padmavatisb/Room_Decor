@@ -40,7 +40,6 @@ function App() {
   let previousTouch = null;
   let initialDistance = 0;
   let currentScale = 1;
-  let modelRotationY = 0;
 
   init();
   setupFurnitureSelection();
@@ -105,7 +104,6 @@ function App() {
       renderer.xr.enabled = !event.value;
     });
 
-    // Disable transform control for mobile
     if (!/Mobi|Android/i.test(navigator.userAgent)) {
       scene.add(transformControl);
     }
@@ -125,7 +123,6 @@ function App() {
     }
 
     controller = renderer.xr.getController(0);
-    controller.addEventListener("select", onSelect);
     scene.add(controller);
 
     reticle = new THREE.Mesh(
@@ -136,31 +133,9 @@ function App() {
     reticle.visible = false;
     scene.add(reticle);
 
-    // Touch event listeners
     renderer.domElement.addEventListener("touchstart", onTouchStart, false);
     renderer.domElement.addEventListener("touchmove", onTouchMove, false);
     renderer.domElement.addEventListener("touchend", onTouchEnd, false);
-  }
-
-  function onSelect() {
-    if (reticle.visible) {
-      let newModel = items[itemSelectedIndex].clone();
-      newModel.visible = true;
-
-      reticle.matrix.decompose(newModel.position, newModel.quaternion, newModel.scale);
-
-      let scaleFactor = modelScaleFactor[itemSelectedIndex];
-      newModel.scale.set(scaleFactor, scaleFactor, scaleFactor);
-
-      scene.add(newModel);
-      selectedModel = newModel;
-      currentScale = scaleFactor;
-      modelRotationY = 0;
-
-      if (!/Mobi|Android/i.test(navigator.userAgent)) {
-        transformControl.attach(selectedModel);
-      }
-    }
   }
 
   const onClicked = (e, selectItem, index) => {
@@ -194,13 +169,24 @@ function App() {
   }
 
   function onTouchStart(e) {
-    if (!selectedModel) return;
+    if (!selectedModel && reticle.visible) {
+      let newModel = items[itemSelectedIndex].clone();
+      newModel.visible = true;
+      reticle.matrix.decompose(newModel.position, newModel.quaternion, newModel.scale);
+      let scaleFactor = modelScaleFactor[itemSelectedIndex];
+      newModel.scale.set(scaleFactor, scaleFactor, scaleFactor);
+      scene.add(newModel);
+      selectedModel = newModel;
+      currentScale = scaleFactor;
+    }
 
-    if (e.touches.length === 1) {
-      isDragging = true;
-      previousTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    } else if (e.touches.length === 2) {
-      initialDistance = getDistance(e.touches);
+    if (selectedModel) {
+      if (e.touches.length === 1) {
+        isDragging = true;
+        previousTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      } else if (e.touches.length === 2) {
+        initialDistance = getDistance(e.touches);
+      }
     }
   }
 
@@ -211,24 +197,17 @@ function App() {
       const dx = e.touches[0].clientX - previousTouch.x;
       const dy = e.touches[0].clientY - previousTouch.y;
 
-      selectedModel.position.x += dx * 0.001;
-      selectedModel.position.z += dy * 0.001;
+      selectedModel.rotation.y += dx * 0.005;
+      selectedModel.rotation.x += dy * 0.005;
 
       previousTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-
-      if (Math.abs(dx) > 20) {
-        modelRotationY += dx > 0 ? 0.05 : -0.05;
-        selectedModel.rotation.y = modelRotationY;
-      }
     }
 
     if (e.touches.length === 2) {
       const newDistance = getDistance(e.touches);
       const scaleChange = newDistance / initialDistance;
-
       currentScale *= scaleChange;
       selectedModel.scale.set(currentScale, currentScale, currentScale);
-
       initialDistance = newDistance;
     }
   }
