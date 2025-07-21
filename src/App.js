@@ -166,4 +166,4 @@ function render(timestamp, frame) {
     }
   }
   renderer.render(scene, camera);
-} REMOVE TAP GESTURE TO INSERT MODEL ADD L SHAPE GESTURE TO INSERT A MODEL  
+}
