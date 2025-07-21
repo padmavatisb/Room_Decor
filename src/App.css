@@ -37,6 +37,28 @@
   }
 }
 
+/* Just Updated ARButton style */
 #ARButton {
+  position: absolute;
   bottom: 20%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+#ARButton:hover {
+  background-color: #0056b3;
+}
+
+/* Selected model indicator */
+.clicked {
+  border: 2px solid #00ffff;
+  background-color: #333;
 }
