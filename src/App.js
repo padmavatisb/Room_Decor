@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { ARButton } from "three/examples/jsm/webxr/ARButton";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { XREstimatedLight } from "three/examples/jsm/webxr/XREstimatedLight";
+import { TransformControls } from "three/examples/jsm/controls/TransformControls";
 
 function App() {
   let reticle;
@@ -10,6 +11,9 @@ function App() {
   let hitTestSourceRequested = false;
 
   let scene, camera, renderer;
+  let transformControl;
+  let xrLight;
+  let fallbackLight, directionalLight;
 
   let models = [
     "./dylan_armchair_yolk_yellow.glb",
@@ -18,10 +22,16 @@ function App() {
     "./flippa_functional_coffee_table_w._storagewalnut.glb",
     "./frame_armchairpetrol_velvet_with_gold_frame.glb",
     "./elnaz_nesting_side_tables_brass__green_marble.glb",
+    "standing_lamp.glb",
+    "plant_decor.glb",
+    "little_bookcase.glb",
+    "dining_set.glb",
   ];
-  let modelScaleFactor = [0.01, 0.01, 0.005, 0.01, 0.01, 0.01];
+
+  let modelScaleFactor = [0.01, 0.01, 0.005, 0.01, 0.01, 0.01, 0.1, 1, 1, 1];
   let items = [];
   let itemSelectedIndex = 0;
+  let selectedModel = null;
 
   let controller;
 
@@ -32,16 +42,7 @@ function App() {
   function init() {
     let myCanvas = document.getElementById("canvas");
     scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(
-      70,
-      myCanvas.innerWidth / myCanvas.innerHeight,
-      0.01,
-      20
-    );
-
-    const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-    light.position.set(0.5, 1, 0.25);
-    scene.add(light);
+    camera = new THREE.PerspectiveCamera(70, myCanvas.innerWidth / myCanvas.innerHeight, 0.01, 20);
 
     renderer = new THREE.WebGLRenderer({
       canvas: myCanvas,
@@ -50,42 +51,69 @@ function App() {
     });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(myCanvas.innerWidth, myCanvas.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.xr.enabled = true;
 
-    // Don't add the XREstimatedLight to the scene initially
-    // It doesn't have any estimated lighting values until an AR session starts
-    const xrLight = new XREstimatedLight(renderer);
+    // Fallback Lights (when AR light estimation is not available)
+    fallbackLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
+    fallbackLight.position.set(0, 1, 0);
+    scene.add(fallbackLight);
+
+    directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+    directionalLight.position.set(0, 4, 2);
+    directionalLight.castShadow = true;
+    scene.add(directionalLight);
+
+    // Light Estimation Setup
+    xrLight = new XREstimatedLight(renderer);
     xrLight.addEventListener("estimationstart", () => {
-      // Swap the default light out for the estimated one so we start getting some estimated values.
       scene.add(xrLight);
-      scene.remove(light);
-      // The estimated lighting also provides an env cubemap which we apply here
+      if (xrLight.light) {
+        xrLight.light.castShadow = true;
+        xrLight.light.intensity = 1;
+      }
+      scene.remove(fallbackLight);
+      scene.remove(directionalLight);
       if (xrLight.environment) {
         scene.environment = xrLight.environment;
       }
     });
 
     xrLight.addEventListener("estimationend", () => {
-      // Swap the lights back when we stop receiving estimated values
-      scene.add(light);
       scene.remove(xrLight);
-
-      // Revert back to the default environment
-      // scene.environment =
+      scene.add(fallbackLight);
+      scene.add(directionalLight);
+      scene.environment = null;
     });
 
-    let arButton = ARButton.createButton(renderer, {
+    // AR Button
+    const arButton = ARButton.createButton(renderer, {
       requiredFeatures: ["hit-test"],
-      optionalFeatures: ["dom-overlay", "light-estimation"],
+      optionalFeatures: ["light-estimation", "dom-overlay"],
       domOverlay: { root: document.body },
     });
     arButton.style.bottom = "20%";
     document.body.appendChild(arButton);
 
+    // Transform Controls
+    transformControl = new TransformControls(camera, renderer.domElement);
+    transformControl.addEventListener("dragging-changed", (event) => {
+      renderer.xr.enabled = !event.value;
+    });
+    scene.add(transformControl);
+
+    // Load Models
     for (let i = 0; i < models.length; i++) {
       const loader = new GLTFLoader();
       loader.load(models[i], function (glb) {
         let model = glb.scene;
+        model.traverse((child) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
         items[i] = model;
       });
     }
@@ -94,44 +122,57 @@ function App() {
     controller.addEventListener("select", onSelect);
     scene.add(controller);
 
+    // Reticle
     reticle = new THREE.Mesh(
       new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial()
+      new THREE.MeshBasicMaterial({ color: 0x00ff00 })
     );
     reticle.matrixAutoUpdate = false;
     reticle.visible = false;
     scene.add(reticle);
+
+    // Transform Gizmo Keyboard Shortcuts
+    window.addEventListener("keydown", (e) => {
+      switch (e.key.toLowerCase()) {
+        case "t":
+          transformControl.setMode("translate");
+          break;
+        case "r":
+          transformControl.setMode("rotate");
+          break;
+        case "s":
+          transformControl.setMode("scale");
+          break;
+      }
+    });
   }
 
   function onSelect() {
     if (reticle.visible) {
       let newModel = items[itemSelectedIndex].clone();
       newModel.visible = true;
-      // this one will set the position but not the rotation
-      // newModel.position.setFromMatrixPosition(reticle.matrix);
 
-      // this will set the position and the rotation to face you
       reticle.matrix.decompose(
         newModel.position,
         newModel.quaternion,
         newModel.scale
       );
+
       let scaleFactor = modelScaleFactor[itemSelectedIndex];
       newModel.scale.set(scaleFactor, scaleFactor, scaleFactor);
 
       scene.add(newModel);
+      selectedModel = newModel;
+      transformControl.attach(selectedModel);
     }
   }
 
   const onClicked = (e, selectItem, index) => {
     itemSelectedIndex = index;
-
-    // remove image selection from others to indicate unclicked
     for (let i = 0; i < models.length; i++) {
       const el = document.querySelector(`#item` + i);
       el.classList.remove("clicked");
     }
-    // set image to selected
     e.target.classList.add("clicked");
   };
 
@@ -159,16 +200,14 @@ function App() {
       const referenceSpace = renderer.xr.getReferenceSpace();
       const session = renderer.xr.getSession();
 
-      if (hitTestSourceRequested === false) {
-        session.requestReferenceSpace("viewer").then(function (referenceSpace) {
-          session
-            .requestHitTestSource({ space: referenceSpace })
-            .then(function (source) {
-              hitTestSource = source;
-            });
+      if (!hitTestSourceRequested) {
+        session.requestReferenceSpace("viewer").then((refSpace) => {
+          session.requestHitTestSource({ space: refSpace }).then((source) => {
+            hitTestSource = source;
+          });
         });
 
-        session.addEventListener("end", function () {
+        session.addEventListener("end", () => {
           hitTestSourceRequested = false;
           hitTestSource = null;
         });
@@ -178,14 +217,10 @@ function App() {
 
       if (hitTestSource) {
         const hitTestResults = frame.getHitTestResults(hitTestSource);
-
         if (hitTestResults.length) {
           const hit = hitTestResults[0];
-
           reticle.visible = true;
-          reticle.matrix.fromArray(
-            hit.getPose(referenceSpace).transform.matrix
-          );
+          reticle.matrix.fromArray(hit.getPose(referenceSpace).transform.matrix);
         } else {
           reticle.visible = false;
         }
