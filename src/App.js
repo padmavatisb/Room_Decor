@@ -1,4 +1,4 @@
-// Gesture-based AR Model Interaction Code
+// Gesture-based AR Model Interaction Code with Gizmo Controls
 import "./App.css";
 import * as THREE from "three";
 import { ARButton } from "three/examples/jsm/webxr/ARButton";
@@ -11,11 +11,7 @@ let controller;
 let reticle;
 let model = null;
 let mixer;
-let gestureStart = null;
-let previousTouchDistance = null;
-let modelPosition = null;
-
-let allowTranslate = false;
+let transformControl;
 
 init();
 
@@ -45,14 +41,52 @@ function init() {
     scene.add(controller);
 
     const geometry = new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2);
-    const material = new THREE.MeshBasicMaterial();
+    const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
     reticle = new THREE.Mesh(geometry, material);
     reticle.matrixAutoUpdate = false;
     reticle.visible = false;
     scene.add(reticle);
 
-    const hitTestSourceRequested = false;
     let hitTestSource = null;
+    let hitTestSourceRequested = false;
+
+    // Add Transform Controls (Gizmo)
+    transformControl = new TransformControls(camera, renderer.domElement);
+    transformControl.addEventListener('dragging-changed', function (event) {
+        renderer.xr.enabled = !event.value;
+    });
+    scene.add(transformControl);
+
+    window.addEventListener('dblclick', () => {
+        if (reticle.visible) {
+            loader.load("/models/chair/scene.gltf", function (gltf) {
+                if (model) {
+                    scene.remove(model);
+                    transformControl.detach();
+                }
+                model = gltf.scene;
+                model.scale.set(0.3, 0.3, 0.3);
+                model.position.setFromMatrixPosition(reticle.matrix);
+                scene.add(model);
+                transformControl.attach(model);
+            });
+        }
+    });
+
+    // Keyboard toggle between translate, rotate, and scale
+    window.addEventListener('keydown', (event) => {
+        switch (event.key.toLowerCase()) {
+            case 't':
+                transformControl.setMode('translate');
+                break;
+            case 'r':
+                transformControl.setMode('rotate');
+                break;
+            case 's':
+                transformControl.setMode('scale');
+                break;
+        }
+    });
 
     renderer.setAnimationLoop((timestamp, frame) => {
         if (frame) {
@@ -70,6 +104,8 @@ function init() {
                     hitTestSourceRequested = false;
                     hitTestSource = null;
                 });
+
+                hitTestSourceRequested = true;
             }
 
             if (hitTestSource) {
@@ -88,82 +124,4 @@ function init() {
 
         renderer.render(scene, camera);
     });
-
-    window.addEventListener('touchstart', onTouchStart, false);
-    window.addEventListener('touchmove', onTouchMove, false);
-    window.addEventListener('touchend', onTouchEnd, false);
-
-    function onTouchStart(event) {
-        if (event.touches.length === 1) {
-            gestureStart = {
-                x: event.touches[0].clientX,
-                y: event.touches[0].clientY,
-                time: Date.now()
-            };
-        } else if (event.touches.length === 2) {
-            previousTouchDistance = getTouchDistance(event);
-        }
-    }
-
-    function onTouchMove(event) {
-        if (!model) return;
-
-        if (event.touches.length === 1 && gestureStart) {
-            const dx = event.touches[0].clientX - gestureStart.x;
-            const dy = event.touches[0].clientY - gestureStart.y;
-
-            if (allowTranslate) {
-                model.position.x += dx * 0.0005;
-                model.position.z += dy * 0.0005;
-            } else {
-                model.rotation.y += dx * 0.01;
-                model.rotation.x += dy * 0.01;
-            }
-
-            gestureStart = {
-                x: event.touches[0].clientX,
-                y: event.touches[0].clientY,
-                time: Date.now()
-            };
-        }
-
-        if (event.touches.length === 2) {
-            const newDistance = getTouchDistance(event);
-            const scaleFactor = newDistance / previousTouchDistance;
-
-            model.scale.multiplyScalar(scaleFactor);
-            previousTouchDistance = newDistance;
-        }
-    }
-
-    function onTouchEnd(event) {
-        // Detect L gesture for inserting model
-        if (gestureStart && Date.now() - gestureStart.time < 1000) {
-            const dx = event.changedTouches[0].clientX - gestureStart.x;
-            const dy = event.changedTouches[0].clientY - gestureStart.y;
-
-            if (Math.abs(dx) > 50 && Math.abs(dy) > 50 && dx > 0 && dy > 0) {
-                if (reticle.visible) {
-                    if (model) {
-                        modelPosition = model.position.clone();
-                    }
-                    loader.load("/models/chair/scene.gltf", function (gltf) {
-                        model = gltf.scene;
-                        model.scale.set(0.3, 0.3, 0.3);
-                        model.position.setFromMatrixPosition(reticle.matrix);
-                        scene.add(model);
-                    });
-                }
-            }
-        }
-
-        allowTranslate = false;
-        gestureStart = null;
-    }
-
-    function getTouchDistance(event) {
-        const dx = event.touches[0].clientX - event.touches[1].clientX;
-        const dy = event.touches[0].clientY - event.touches[1].clientY;
-        return Math.sqrt(dx * dx + dy * dy);
-    }
 }
