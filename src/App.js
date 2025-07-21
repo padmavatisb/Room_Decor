@@ -233,4 +233,4 @@ function App() {
   return <div className="App"></div>;
 }
 
-export default App;  WHAT ARE WE DOING TO MOVE TRANSLATE AND INSERT AN OBJECT
+export default App;  
