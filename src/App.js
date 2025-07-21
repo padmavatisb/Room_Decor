@@ -4,306 +4,228 @@ import { ARButton } from "three/examples/jsm/webxr/ARButton";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { XREstimatedLight } from "three/examples/jsm/webxr/XREstimatedLight";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+import { useEffect } from "react";
 
 function App() {
-  let reticle;
-  let hitTestSource = null;
-  let hitTestSourceRequested = false;
-
-  let scene, camera, renderer;
-  let transformControl;
-  let xrLight;
-  let fallbackLight, directionalLight;
-
-  let models = [
-    "./dylan_armchair_yolk_yellow.glb",
-    "./ivan_armchair_mineral_blue.glb",
-    "./marble_coffee_table.glb",
-    "./flippa_functional_coffee_table_w._storagewalnut.glb",
-    "./frame_armchairpetrol_velvet_with_gold_frame.glb",
-    "./elnaz_nesting_side_tables_brass__green_marble.glb",
-    "standing_lamp.glb",
-    "plant_decor.glb",
-    "little_bookcase.glb",
-    "dining_set.glb",
-  ];
-
-  let modelScaleFactor = [0.01, 0.01, 0.005, 0.01, 0.01, 0.01, 0.1, 1, 1, 1];
-  let items = [];
-  let itemSelectedIndex = 0;
-  let selectedModel = null;
-
-  let controller;
-
-  // ✅ Gesture support variables
-  let isTouching = false;
-  let previousTouchDistance = null;
-  let initialRotation = null;
-  let selectedTouchModel = null;
-
-  init();
-  setupFurnitureSelection();
-  animate();
-
-  function init() {
-    let myCanvas = document.getElementById("canvas");
-    scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(70, myCanvas.innerWidth / myCanvas.innerHeight, 0.01, 20);
-
-    renderer = new THREE.WebGLRenderer({
-      canvas: myCanvas,
-      antialias: true,
-      alpha: true,
-    });
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(myCanvas.innerWidth, myCanvas.innerHeight);
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  useEffect(() => {
+    let selectedModel = null;
+    let selectedTouchModel = null;
+    let activeModel = null;
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(
+      70,
+      window.innerWidth / window.innerHeight,
+      0.01,
+      20
+    );
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.xr.enabled = true;
+    document.body.appendChild(renderer.domElement);
+    document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ["hit-test"] }));
 
-    // ✅ Add touch gesture event listeners
-    renderer.domElement.addEventListener("touchstart", onTouchStart, false);
-    renderer.domElement.addEventListener("touchmove", onTouchMove, false);
-    renderer.domElement.addEventListener("touchend", onTouchEnd, false);
-
-    // Fallback Lights
-    fallbackLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
-    fallbackLight.position.set(0, 1, 0);
-    scene.add(fallbackLight);
-
-    directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
-    directionalLight.position.set(0, 4, 2);
-    directionalLight.castShadow = true;
-    scene.add(directionalLight);
-
-    // Light Estimation Setup
-    xrLight = new XREstimatedLight(renderer);
-    xrLight.addEventListener("estimationstart", () => {
-      scene.add(xrLight);
-      if (xrLight.light) {
-        xrLight.light.castShadow = true;
-        xrLight.light.intensity = 1;
-      }
-      scene.remove(fallbackLight);
-      scene.remove(directionalLight);
-      if (xrLight.environment) {
-        scene.environment = xrLight.environment;
-      }
-    });
-
-    xrLight.addEventListener("estimationend", () => {
-      scene.remove(xrLight);
-      scene.add(fallbackLight);
-      scene.add(directionalLight);
-      scene.environment = null;
-    });
-
-    const arButton = ARButton.createButton(renderer, {
-      requiredFeatures: ["hit-test"],
-      optionalFeatures: ["light-estimation", "dom-overlay"],
-      domOverlay: { root: document.body },
-    });
-    arButton.style.bottom = "20%";
-    document.body.appendChild(arButton);
-
-    // Transform Controls (optional if gesture used only)
-    transformControl = new TransformControls(camera, renderer.domElement);
-    transformControl.addEventListener("dragging-changed", (event) => {
-      renderer.xr.enabled = !event.value;
-    });
-    scene.add(transformControl);
-
-    // Load Models
-    for (let i = 0; i < models.length; i++) {
-      const loader = new GLTFLoader();
-      loader.load(models[i], function (glb) {
-        let model = glb.scene;
-        model.traverse((child) => {
-          if (child.isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
-          }
-        });
-        items[i] = model;
-      });
-    }
-
-    controller = renderer.xr.getController(0);
-    controller.addEventListener("select", onSelect);
+    const controller = renderer.xr.getController(0);
     scene.add(controller);
 
-    reticle = new THREE.Mesh(
-      new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ color: 0x00ff00 })
-    );
+    const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+    scene.add(light);
+
+    const loader = new GLTFLoader();
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+
+    let reticle;
+    const hitTestSourceRequested = false;
+    let hitTestSource = null;
+
+    // Estimated lighting
+    const estimatedLight = new XREstimatedLight(renderer);
+    scene.add(estimatedLight);
+
+    // Transform controls (optional for dev)
+    const transformControl = new TransformControls(camera, renderer.domElement);
+    scene.add(transformControl);
+
+    // Load furniture models
+    const furnitureModels = {
+      chair: "chair.glb",
+      table: "table.glb",
+      sofa: "sofa.glb"
+    };
+
+    const setupFurnitureSelection = () => {
+      document.querySelectorAll("button.furniture").forEach(btn => {
+        btn.onclick = () => {
+          activeModel = btn.getAttribute("data-model");
+        };
+      });
+    };
+
+    const placeModel = (position, rotation) => {
+      if (!activeModel) return;
+      loader.load(furnitureModels[activeModel], gltf => {
+        const model = gltf.scene;
+        model.position.copy(position);
+        model.rotation.copy(rotation);
+        model.scale.set(0.2, 0.2, 0.2);
+        scene.add(model);
+        selectedModel = model;
+        selectedTouchModel = model;
+      });
+    };
+
+    // Tap-to-place model
+    controller.addEventListener("select", () => {
+      if (reticle && reticle.visible) {
+        placeModel(reticle.position, reticle.rotation);
+      }
+    });
+
+    // Add reticle
+    const geometry = new THREE.RingGeometry(0.05, 0.06, 32).rotateX(-Math.PI / 2);
+    const material = new THREE.MeshBasicMaterial({ color: 0x0fff00 });
+    reticle = new THREE.Mesh(geometry, material);
     reticle.matrixAutoUpdate = false;
     reticle.visible = false;
     scene.add(reticle);
 
-    window.addEventListener("keydown", (e) => {
-      switch (e.key.toLowerCase()) {
-        case "t":
-          transformControl.setMode("translate");
-          break;
-        case "r":
-          transformControl.setMode("rotate");
-          break;
-        case "s":
-          transformControl.setMode("scale");
-          break;
-      }
-    });
-  }
-
-  function onSelect() {
-    if (reticle.visible) {
-      let newModel = items[itemSelectedIndex].clone();
-      newModel.visible = true;
-
-      reticle.matrix.decompose(
-        newModel.position,
-        newModel.quaternion,
-        newModel.scale
-      );
-
-      let scaleFactor = modelScaleFactor[itemSelectedIndex];
-      newModel.scale.set(scaleFactor, scaleFactor, scaleFactor);
-
-      scene.add(newModel);
-      selectedModel = newModel;
-      selectedTouchModel = newModel;
-
-      transformControl.attach(selectedModel); // Optional if gesture only
-    }
-  }
-
-  const onClicked = (e, selectItem, index) => {
-    itemSelectedIndex = index;
-    for (let i = 0; i < models.length; i++) {
-      const el = document.querySelector(`#item` + i);
-      el.classList.remove("clicked");
-    }
-    e.target.classList.add("clicked");
-  };
-
-  function setupFurnitureSelection() {
-    for (let i = 0; i < models.length; i++) {
-      const el = document.querySelector(`#item` + i);
-      el.addEventListener("beforexrselect", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      });
-      el.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onClicked(e, items[i], i);
+    const session = renderer.xr.getSession();
+    if (session) {
+      session.addEventListener("end", () => {
+        hitTestSource = null;
       });
     }
-  }
 
-  function animate() {
-    renderer.setAnimationLoop(render);
-  }
-
-  function render(timestamp, frame) {
-    if (frame) {
-      const referenceSpace = renderer.xr.getReferenceSpace();
+    let referenceSpace;
+    renderer.xr.addEventListener("sessionstart", async () => {
       const session = renderer.xr.getSession();
+      referenceSpace = await session.requestReferenceSpace("viewer");
+      const hitTestSourceRequest = await session.requestHitTestSource({ space: referenceSpace });
+      hitTestSource = hitTestSourceRequest;
+    });
 
-      if (!hitTestSourceRequested) {
-        session.requestReferenceSpace("viewer").then((refSpace) => {
-          session.requestHitTestSource({ space: refSpace }).then((source) => {
-            hitTestSource = source;
-          });
-        });
+    // Gesture support
+    let initialDistance = null;
+    let initialScale = null;
+    let lastRotation = 0;
 
-        session.addEventListener("end", () => {
-          hitTestSourceRequested = false;
-          hitTestSource = null;
-        });
+    const getTouchDistance = touches => {
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    };
 
-        hitTestSourceRequested = true;
-      }
+    const getRotationAngle = touches => {
+      const dx = touches[1].clientX - touches[0].clientX;
+      const dy = touches[1].clientY - touches[0].clientY;
+      return Math.atan2(dy, dx);
+    };
 
-      if (hitTestSource) {
-        const hitTestResults = frame.getHitTestResults(hitTestSource);
-        if (hitTestResults.length) {
-          const hit = hitTestResults[0];
-          reticle.visible = true;
-          reticle.matrix.fromArray(hit.getPose(referenceSpace).transform.matrix);
-        } else {
-          reticle.visible = false;
+    const onTouchMove = e => {
+      if (!selectedTouchModel || e.touches.length === 0) return;
+
+      if (e.touches.length === 1) {
+        // Move
+        const touch = e.touches[0];
+        const x = (touch.clientX / window.innerWidth) * 2 - 1;
+        const y = -(touch.clientY / window.innerHeight) * 2 + 1;
+
+        raycaster.setFromCamera({ x, y }, camera);
+        const intersect = raycaster.intersectObject(reticle);
+        if (intersect.length > 0) {
+          selectedTouchModel.position.copy(intersect[0].point);
         }
       }
-    }
 
-    renderer.render(scene, camera);
-  }
+      if (e.touches.length === 2) {
+        const currentDistance = getTouchDistance(e.touches);
+        const currentRotation = getRotationAngle(e.touches);
 
-  // ✅ Gesture handler functions
+        if (initialDistance === null) {
+          initialDistance = currentDistance;
+          initialScale = selectedTouchModel.scale.x;
+          lastRotation = currentRotation;
+        } else {
+          const scaleFactor = currentDistance / initialDistance;
+          selectedTouchModel.scale.setScalar(initialScale * scaleFactor);
 
-  function getMidpoint(touches) {
-    const x = (touches[0].clientX + touches[1].clientX) / 2;
-    const y = (touches[0].clientY + touches[1].clientY) / 2;
-    return { x, y };
-  }
+          const rotationDelta = currentRotation - lastRotation;
+          selectedTouchModel.rotation.y += rotationDelta;
+          lastRotation = currentRotation;
+        }
+      }
+    };
 
-  function onTouchStart(event) {
-    if (!selectedModel) return;
-    selectedTouchModel = selectedModel;
-    isTouching = true;
+    const onTouchEnd = () => {
+      initialDistance = null;
+      lastRotation = 0;
+    };
 
-    if (event.touches.length === 2) {
-      const dx = event.touches[0].clientX - event.touches[1].clientX;
-      const dy = event.touches[0].clientY - event.touches[1].clientY;
-      previousTouchDistance = Math.sqrt(dx * dx + dy * dy);
-      initialRotation = Math.atan2(dy, dx);
-    }
-  }
+    // Tap to select model
+    renderer.domElement.addEventListener("touchstart", event => {
+      if (event.touches.length !== 1) return;
 
-  function onTouchMove(event) {
-    if (!isTouching || !selectedTouchModel) return;
-
-    if (event.touches.length === 1) {
       const touch = event.touches[0];
-      const x = (touch.clientX / window.innerWidth) * 2 - 1;
-      const y = -(touch.clientY / window.innerHeight) * 2 + 1;
+      pointer.x = (touch.clientX / window.innerWidth) * 2 - 1;
+      pointer.y = -(touch.clientY / window.innerHeight) * 2 + 1;
 
-      const vector = new THREE.Vector3(x, y, 0.5).unproject(camera);
-      const dir = vector.sub(camera.position).normalize();
-      const distance = -camera.position.y / dir.y;
-      const pos = camera.position.clone().add(dir.multiplyScalar(distance));
+      raycaster.setFromCamera(pointer, camera);
+      const intersects = raycaster.intersectObjects(scene.children, true);
 
-      selectedTouchModel.position.x = pos.x;
-      selectedTouchModel.position.z = pos.z;
-    }
+      if (intersects.length > 0) {
+        let target = intersects[0].object;
+        while (target.parent && target.parent.type !== "Scene") {
+          target = target.parent;
+        }
+        selectedModel = target;
+        selectedTouchModel = target;
+        transformControl.attach(target);
+        console.log("Selected model:", target.name || target.uuid);
+      }
+    });
 
-    if (event.touches.length === 2) {
-      const dx = event.touches[0].clientX - event.touches[1].clientX;
-      const dy = event.touches[0].clientY - event.touches[1].clientY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+    window.addEventListener("touchmove", onTouchMove, false);
+    window.addEventListener("touchend", onTouchEnd, false);
 
-      if (previousTouchDistance) {
-        const scaleFactor = distance / previousTouchDistance;
-        selectedTouchModel.scale.multiplyScalar(scaleFactor);
+    const animate = () => {
+      renderer.setAnimationLoop(render);
+    };
+
+    const render = (timestamp, frame) => {
+      if (frame) {
+        const referenceSpace = renderer.xr.getReferenceSpace();
+        const viewerPose = frame.getViewerPose(referenceSpace);
+
+        if (hitTestSource && viewerPose) {
+          const hitTestResults = frame.getHitTestResults(hitTestSource);
+          if (hitTestResults.length > 0) {
+            const hit = hitTestResults[0];
+            const pose = hit.getPose(referenceSpace);
+            reticle.visible = true;
+            reticle.matrix.fromArray(pose.transform.matrix);
+          } else {
+            reticle.visible = false;
+          }
+        }
       }
 
-      previousTouchDistance = distance;
+      renderer.render(scene, camera);
+    };
 
-      const currentRotation = Math.atan2(dy, dx);
-      const deltaRotation = currentRotation - initialRotation;
-      selectedTouchModel.rotation.y += deltaRotation;
-      initialRotation = currentRotation;
-    }
-  }
+    setupFurnitureSelection();
+    animate();
+  }, []);
 
-  function onTouchEnd(event) {
-    isTouching = false;
-    previousTouchDistance = null;
-    initialRotation = null;
-  }
-
-  return <div className="App"></div>;
+  return (
+    <>
+      <div className="controls">
+        <button className="furniture" data-model="chair">Chair</button>
+        <button className="furniture" data-model="table">Table</button>
+        <button className="furniture" data-model="sofa">Sofa</button>
+      </div>
+    </>
+  );
 }
 
 export default App;
