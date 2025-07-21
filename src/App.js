@@ -1,143 +1,153 @@
-import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
-import { ARButton } from 'three/examples/jsm/webxr/ARButton';
+// Import necessary modules
+import "./App.css";
+import * as THREE from "three";
+import { ARButton } from "three/examples/jsm/webxr/ARButton";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+import { XREstimatedLight } from "three/examples/jsm/webxr/XREstimatedLight";
+import { TransformControls } from "three/examples/jsm/controls/TransformControls";
 
 let camera, scene, renderer;
 let controller;
+let reticle;
+let currentModel = null;
 let models = [];
+let loader;
+
+let lastTouchDistance = null;
+let isRotating = false;
+
+let previousTouches = [];
 let activeModel = null;
-let loader = new GLTFLoader();
-let longPressTimeout;
-let isTranslating = false;
-let previousTouch = null;
 
 init();
 
 function init() {
   scene = new THREE.Scene();
-
-  camera = new THREE.PerspectiveCamera(
-    70,
-    window.innerWidth / window.innerHeight,
-    0.01,
-    20
-  );
-
+  camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.xr.enabled = true;
   document.body.appendChild(renderer.domElement);
+  document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
-  document.body.appendChild(ARButton.createButton(renderer));
+  const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+  light.position.set(0.5, 1, 0.25);
+  scene.add(light);
+
+  loader = new GLTFLoader();
+  const geometry = new THREE.RingGeometry(0.1, 0.11, 32).rotateX(-Math.PI / 2);
+  const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+  reticle = new THREE.Mesh(geometry, material);
+  reticle.matrixAutoUpdate = false;
+  reticle.visible = false;
+  scene.add(reticle);
 
   controller = renderer.xr.getController(0);
   scene.add(controller);
 
-  // Insert first model as default on load
-  insertNewModel();
+  const hitTestSourceRequested = false;
+  let hitTestSource = null;
 
-  // Gesture listeners
-  renderer.domElement.addEventListener('touchstart', onTouchStart, false);
-  renderer.domElement.addEventListener('touchmove', onTouchMove, false);
-  renderer.domElement.addEventListener('touchend', onTouchEnd, false);
-
-  animate();
-}
-
-function insertNewModel(path = 'model.gltf') {
-  loader.load(path, function (gltf) {
-    const model = gltf.scene;
-    model.position.set(0, 0, -0.5).applyMatrix4(controller.matrixWorld);
-    model.rotation.set(0, 0, 0);
-    model.scale.set(0.2, 0.2, 0.2);
-    scene.add(model);
-    models.push(model);
-    activeModel = model;
+  renderer.setAnimationLoop(function (timestamp, frame) {
+    if (frame) {
+      const referenceSpace = renderer.xr.getReferenceSpace();
+      const session = renderer.xr.getSession();
+      if (!hitTestSourceRequested) {
+        session.requestReferenceSpace('viewer').then((refSpace) => {
+          session.requestHitTestSource({ space: refSpace }).then((source) => {
+            hitTestSource = source;
+          });
+        });
+        session.addEventListener('end', () => {
+          hitTestSourceRequested = false;
+          hitTestSource = null;
+        });
+      }
+      if (hitTestSource) {
+        const hitTestResults = frame.getHitTestResults(hitTestSource);
+        if (hitTestResults.length > 0) {
+          const hit = hitTestResults[0];
+          const pose = hit.getPose(referenceSpace);
+          reticle.visible = true;
+          reticle.matrix.fromArray(pose.transform.matrix);
+        } else {
+          reticle.visible = false;
+        }
+      }
+    }
+    renderer.render(scene, camera);
   });
+
+  window.addEventListener("touchstart", onTouchStart);
+  window.addEventListener("touchmove", onTouchMove);
+  window.addEventListener("touchend", onTouchEnd);
 }
 
 function onTouchStart(event) {
-  if (event.touches.length === 1) {
-    longPressTimeout = setTimeout(() => {
-      isTranslating = true;
-      previousTouch = event.touches[0];
-    }, 1000); // 1-second hold to start move
-  }
-
   if (event.touches.length === 2) {
-    previousTouch = {
-      x1: event.touches[0].clientX,
-      y1: event.touches[0].clientY,
-      x2: event.touches[1].clientX,
-      y2: event.touches[1].clientY
-    };
-  }
-
-  if (event.touches.length === 3) {
-    const touch = event.touches;
-    if (
-      Math.abs(touch[0].clientY - touch[1].clientY) < 50 &&
-      Math.abs(touch[1].clientX - touch[2].clientX) < 50
-    ) {
-      // L-shape gesture detected
-      insertNewModel();
-    }
+    previousTouches = [...event.touches];
+  } else if (event.touches.length === 1) {
+    isRotating = true;
   }
 }
 
 function onTouchMove(event) {
   if (!activeModel) return;
+  if (event.touches.length === 2) {
+    const dx1 = previousTouches[0].clientX - previousTouches[1].clientX;
+    const dy1 = previousTouches[0].clientY - previousTouches[1].clientY;
+    const dist1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
 
-  if (isTranslating && event.touches.length === 1) {
-    const touch = event.touches[0];
-    const deltaX = (touch.clientX - previousTouch.clientX) * 0.001;
-    const deltaY = (touch.clientY - previousTouch.clientY) * 0.001;
+    const dx2 = event.touches[0].clientX - event.touches[1].clientX;
+    const dy2 = event.touches[0].clientY - event.touches[1].clientY;
+    const dist2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+
+    const delta = dist2 - dist1;
+    activeModel.scale.multiplyScalar(1 + delta * 0.005);
+
+    // Translate model based on average touch movement
+    const avgPrevX = (previousTouches[0].clientX + previousTouches[1].clientX) / 2;
+    const avgPrevY = (previousTouches[0].clientY + previousTouches[1].clientY) / 2;
+    const avgCurrX = (event.touches[0].clientX + event.touches[1].clientX) / 2;
+    const avgCurrY = (event.touches[0].clientY + event.touches[1].clientY) / 2;
+
+    const deltaX = (avgCurrX - avgPrevX) * 0.001;
+    const deltaZ = (avgCurrY - avgPrevY) * 0.001;
+
     activeModel.position.x += deltaX;
-    activeModel.position.y -= deltaY;
-    previousTouch = touch;
-  }
+    activeModel.position.z += deltaZ;
 
-  if (event.touches.length === 1 && !isTranslating) {
-    const deltaX = event.touches[0].clientX - previousTouch.clientX;
-    const deltaY = event.touches[0].clientY - previousTouch.clientY;
+    previousTouches = [...event.touches];
+  } else if (isRotating && event.touches.length === 1) {
+    const deltaX = event.touches[0].movementX || (event.touches[0].clientX - (previousTouches[0]?.clientX || event.touches[0].clientX));
+    const deltaY = event.touches[0].movementY || (event.touches[0].clientY - (previousTouches[0]?.clientY || event.touches[0].clientY));
     activeModel.rotation.y += deltaX * 0.01;
     activeModel.rotation.x += deltaY * 0.01;
-    previousTouch = event.touches[0];
-  }
-
-  if (event.touches.length === 2) {
-    const touch = event.touches;
-    const dist = Math.hypot(
-      touch[0].clientX - touch[1].clientX,
-      touch[0].clientY - touch[1].clientY
-    );
-    const prevDist = Math.hypot(
-      previousTouch.x1 - previousTouch.x2,
-      previousTouch.y1 - previousTouch.y2
-    );
-    const scaleChange = dist / prevDist;
-    activeModel.scale.multiplyScalar(scaleChange);
-    previousTouch = {
-      x1: touch[0].clientX,
-      y1: touch[0].clientY,
-      x2: touch[1].clientX,
-      y2: touch[1].clientY
-    };
+    previousTouches = [...event.touches];
   }
 }
 
-function onTouchEnd() {
-  clearTimeout(longPressTimeout);
-  isTranslating = false;
+function onTouchEnd(event) {
+  isRotating = false;
+  previousTouches = [];
 }
 
-function animate() {
-  renderer.setAnimationLoop(function () {
-    renderer.render(scene, camera);
-  });
+function loadModel(modelPath) {
+  if (reticle.visible) {
+    if (activeModel) {
+      activeModel = null; // Fix the current model in place
+    }
+    loader.load(modelPath, function (gltf) {
+      const model = gltf.scene;
+      model.position.setFromMatrixPosition(reticle.matrix);
+      model.quaternion.setFromRotationMatrix(reticle.matrix);
+      model.scale.set(0.2, 0.2, 0.2);
+      scene.add(model);
+      models.push(model);
+      activeModel = model;
+    });
+  }
 }
 
-// External function to switch model type
-window.loadModel = function (modelPath) {
-  insertNewModel(modelPath);
-};
+// Example usage: trigger this with L-shape gesture detection logic
+// loadModel('path_to_model.gltf');
