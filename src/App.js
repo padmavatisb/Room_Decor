@@ -35,6 +35,13 @@ function App() {
 
   let controller;
 
+  // Gesture variables
+  let isDragging = false;
+  let previousTouch = null;
+  let initialDistance = 0;
+  let currentScale = 1;
+  let modelRotationY = 0;
+
   init();
   setupFurnitureSelection();
   animate();
@@ -55,7 +62,6 @@ function App() {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.xr.enabled = true;
 
-    // Fallback Lights (when AR light estimation is not available)
     fallbackLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
     fallbackLight.position.set(0, 1, 0);
     scene.add(fallbackLight);
@@ -65,7 +71,6 @@ function App() {
     directionalLight.castShadow = true;
     scene.add(directionalLight);
 
-    // Light Estimation Setup
     xrLight = new XREstimatedLight(renderer);
     xrLight.addEventListener("estimationstart", () => {
       scene.add(xrLight);
@@ -87,7 +92,6 @@ function App() {
       scene.environment = null;
     });
 
-    // AR Button
     const arButton = ARButton.createButton(renderer, {
       requiredFeatures: ["hit-test"],
       optionalFeatures: ["light-estimation", "dom-overlay"],
@@ -96,14 +100,16 @@ function App() {
     arButton.style.bottom = "20%";
     document.body.appendChild(arButton);
 
-    // Transform Controls
     transformControl = new TransformControls(camera, renderer.domElement);
     transformControl.addEventListener("dragging-changed", (event) => {
       renderer.xr.enabled = !event.value;
     });
-    scene.add(transformControl);
 
-    // Load Models
+    // Disable transform control for mobile
+    if (!/Mobi|Android/i.test(navigator.userAgent)) {
+      scene.add(transformControl);
+    }
+
     for (let i = 0; i < models.length; i++) {
       const loader = new GLTFLoader();
       loader.load(models[i], function (glb) {
@@ -122,7 +128,6 @@ function App() {
     controller.addEventListener("select", onSelect);
     scene.add(controller);
 
-    // Reticle
     reticle = new THREE.Mesh(
       new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
       new THREE.MeshBasicMaterial({ color: 0x00ff00 })
@@ -131,20 +136,10 @@ function App() {
     reticle.visible = false;
     scene.add(reticle);
 
-    // Transform Gizmo Keyboard Shortcuts
-    window.addEventListener("keydown", (e) => {
-      switch (e.key.toLowerCase()) {
-        case "t":
-          transformControl.setMode("translate");
-          break;
-        case "r":
-          transformControl.setMode("rotate");
-          break;
-        case "s":
-          transformControl.setMode("scale");
-          break;
-      }
-    });
+    // Touch event listeners
+    renderer.domElement.addEventListener("touchstart", onTouchStart, false);
+    renderer.domElement.addEventListener("touchmove", onTouchMove, false);
+    renderer.domElement.addEventListener("touchend", onTouchEnd, false);
   }
 
   function onSelect() {
@@ -152,18 +147,19 @@ function App() {
       let newModel = items[itemSelectedIndex].clone();
       newModel.visible = true;
 
-      reticle.matrix.decompose(
-        newModel.position,
-        newModel.quaternion,
-        newModel.scale
-      );
+      reticle.matrix.decompose(newModel.position, newModel.quaternion, newModel.scale);
 
       let scaleFactor = modelScaleFactor[itemSelectedIndex];
       newModel.scale.set(scaleFactor, scaleFactor, scaleFactor);
 
       scene.add(newModel);
       selectedModel = newModel;
-      transformControl.attach(selectedModel);
+      currentScale = scaleFactor;
+      modelRotationY = 0;
+
+      if (!/Mobi|Android/i.test(navigator.userAgent)) {
+        transformControl.attach(selectedModel);
+      }
     }
   }
 
@@ -189,6 +185,57 @@ function App() {
         onClicked(e, items[i], i);
       });
     }
+  }
+
+  function getDistance(touches) {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function onTouchStart(e) {
+    if (!selectedModel) return;
+
+    if (e.touches.length === 1) {
+      isDragging = true;
+      previousTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    } else if (e.touches.length === 2) {
+      initialDistance = getDistance(e.touches);
+    }
+  }
+
+  function onTouchMove(e) {
+    if (!selectedModel) return;
+
+    if (e.touches.length === 1 && isDragging && previousTouch) {
+      const dx = e.touches[0].clientX - previousTouch.x;
+      const dy = e.touches[0].clientY - previousTouch.y;
+
+      selectedModel.position.x += dx * 0.001;
+      selectedModel.position.z += dy * 0.001;
+
+      previousTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+
+      if (Math.abs(dx) > 20) {
+        modelRotationY += dx > 0 ? 0.05 : -0.05;
+        selectedModel.rotation.y = modelRotationY;
+      }
+    }
+
+    if (e.touches.length === 2) {
+      const newDistance = getDistance(e.touches);
+      const scaleChange = newDistance / initialDistance;
+
+      currentScale *= scaleChange;
+      selectedModel.scale.set(currentScale, currentScale, currentScale);
+
+      initialDistance = newDistance;
+    }
+  }
+
+  function onTouchEnd(e) {
+    isDragging = false;
+    previousTouch = null;
   }
 
   function animate() {
