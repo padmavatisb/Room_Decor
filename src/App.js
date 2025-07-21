@@ -17,6 +17,8 @@ let initialTouchPositions = [];
 let lastTouchCenter = null;
 let holdTimeout = null;
 let allowTranslation = false;
+let gesturePath = [];
+let gestureStartTime = null;
 
 init();
 
@@ -89,15 +91,29 @@ function getTouchCenter(touches) {
   };
 }
 
+function recognizeLShape(gesture) {
+  if (gesture.length < 5) return false;
+  let dx = gesture[gesture.length - 1].x - gesture[0].x;
+  let dy = gesture[gesture.length - 1].y - gesture[0].y;
+  let cornerIndex = Math.floor(gesture.length / 2);
+  let corner = gesture[cornerIndex];
+  let beforeCorner = gesture[0];
+  let afterCorner = gesture[gesture.length - 1];
+  let horizontal = Math.abs(corner.x - beforeCorner.x) > 50 && Math.abs(corner.y - beforeCorner.y) < 30;
+  let vertical = Math.abs(afterCorner.y - corner.y) > 50 && Math.abs(afterCorner.x - corner.x) < 30;
+  return horizontal && vertical;
+}
+
 function onTouchStart(event) {
-  if (!model) return;
   currentTouches = event.touches;
 
   if (event.touches.length === 1) {
     previousTouch = event.touches[0];
     holdTimeout = setTimeout(() => {
       allowTranslation = true;
-    }, 2000); // 2 seconds hold to enable translation
+    }, 2000);
+    gesturePath = [{ x: event.touches[0].pageX, y: event.touches[0].pageY }];
+    gestureStartTime = Date.now();
   } else if (event.touches.length === 2) {
     initialDistance = getTouchDistance(event.touches);
     lastTouchCenter = getTouchCenter(event.touches);
@@ -105,22 +121,22 @@ function onTouchStart(event) {
 }
 
 function onTouchMove(event) {
-  if (!model) return;
-
   if (event.touches.length === 1 && previousTouch) {
     const deltaX = event.touches[0].pageX - previousTouch.pageX;
     const deltaY = event.touches[0].pageY - previousTouch.pageY;
 
-    if (allowTranslation) {
+    gesturePath.push({ x: event.touches[0].pageX, y: event.touches[0].pageY });
+
+    if (allowTranslation && model) {
       model.position.x += deltaX * 0.005;
       model.position.y -= deltaY * 0.005;
-    } else {
+    } else if (model) {
       model.rotation.y += deltaX * 0.005;
       model.rotation.x += deltaY * 0.005;
     }
 
     previousTouch = event.touches[0];
-  } else if (event.touches.length === 2) {
+  } else if (event.touches.length === 2 && model) {
     const newDistance = getTouchDistance(event.touches);
     const scale = newDistance / initialDistance;
     model.scale.set(scale * 0.5, scale * 0.5, scale * 0.5);
@@ -137,7 +153,27 @@ function onTouchMove(event) {
 function onTouchEnd(event) {
   currentTouches = event.touches;
   clearTimeout(holdTimeout);
+
+  if (gesturePath.length > 0 && Date.now() - gestureStartTime < 2000) {
+    if (!model || !model.visible) {
+      if (recognizeLShape(gesturePath)) {
+        const referenceSpace = renderer.xr.getReferenceSpace();
+        const frame = renderer.xr.getFrame();
+        const hitTestResults = frame.getHitTestResults(controller);
+        if (hitTestResults.length > 0) {
+          const hit = hitTestResults[0];
+          const pose = hit.getPose(referenceSpace);
+          if (model) {
+            model.visible = true;
+            model.position.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
+          }
+        }
+      }
+    }
+  }
+
   allowTranslation = false;
+  gesturePath = [];
 
   if (event.touches.length < 2) {
     initialDistance = null;
@@ -149,21 +185,5 @@ function onTouchEnd(event) {
 }
 
 function render(timestamp, frame) {
-  if (frame) {
-    const referenceSpace = renderer.xr.getReferenceSpace();
-    const session = renderer.xr.getSession();
-
-    const viewerPose = frame.getViewerPose(referenceSpace);
-    if (viewerPose) {
-      const hitTestResults = frame.getHitTestResults(controller);
-
-      if (hitTestResults.length > 0 && model && !model.visible) {
-        const hit = hitTestResults[0];
-        const pose = hit.getPose(referenceSpace);
-        model.visible = true;
-        model.position.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
-      }
-    }
-  }
   renderer.render(scene, camera);
 }
