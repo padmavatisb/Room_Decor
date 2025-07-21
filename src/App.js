@@ -1,159 +1,153 @@
-// Full AR + Gesture Integration using THREE.js + Hammer.js
-// Feature: Double Tap to Place, One Finger Drag to Move, Rotate with One Finger (Trackpad), Pinch to Scale
-
 import "./App.css";
 import * as THREE from "three";
 import { ARButton } from "three/examples/jsm/webxr/ARButton";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
-import Hammer from "hammerjs";
+import { XREstimatedLight } from "three/examples/jsm/webxr/XREstimatedLight";
+import { TransformControls } from "three/examples/jsm/controls/TransformControls";
 
-let camera, scene, renderer;
-let controller;
-let reticle;
-let selectedModelUrl = null;
-let model = null;
-let currentModel = null;
-let isModelPlaced = false;
-let initialScale = 1;
+function App() {
+  // ... (keep all your existing variable declarations)
 
-init();
+  // Add these new variables for gesture controls
+  let touchStartPosition = new THREE.Vector2();
+  let touchStartDistance = 0;
+  let touchStartRotation = 0;
+  let touchStartModelPosition = new THREE.Vector3();
+  let touchStartModelScale = new THREE.Vector3();
+  let touchStartModelQuaternion = new THREE.Quaternion();
+  let isTwoFingerTouch = false;
+  let isThreeFingerTouch = false;
 
-function init() {
-  const container = document.createElement("div");
-  document.body.appendChild(container);
+  init();
+  setupFurnitureSelection();
+  animate();
 
-  scene = new THREE.Scene();
+  function init() {
+    // ... (keep all your existing init code)
 
-  camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+    // Add touch event listeners
+    const canvas = renderer.domElement;
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+    canvas.addEventListener('touchend', onTouchEnd, { passive: false });
+  }
 
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.xr.enabled = true;
-  container.appendChild(renderer.domElement);
+  // ... (keep all your existing functions until animate())
 
-  document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
-
-  const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-  light.position.set(0.5, 1, 0.25);
-  scene.add(light);
-
-  const loader = new GLTFLoader();
-  const urls = {
-    chair: 'models/chair.glb',
-    table: 'models/table.glb',
-    lamp: 'models/lamp.glb'
-  };
-
-  // Assign model buttons
-  Object.keys(urls).forEach(id => {
-    document.getElementById(id).addEventListener('click', () => {
-      selectedModelUrl = urls[id];
-      console.log('Selected model:', selectedModelUrl);
-    });
-  });
-
-  controller = renderer.xr.getController(0);
-  controller.addEventListener('select', onSelect);
-  scene.add(controller);
-
-  const geometry = new THREE.RingGeometry(0.05, 0.06, 32).rotateX(-Math.PI / 2);
-  const material = new THREE.MeshBasicMaterial({ color: 0x0fff00 });
-  reticle = new THREE.Mesh(geometry, material);
-  reticle.matrixAutoUpdate = false;
-  reticle.visible = false;
-  scene.add(reticle);
-
-  const hitTestSourcePromise = new Promise(resolve => {
-    renderer.xr.addEventListener("sessionstart", async () => {
-      const session = renderer.xr.getSession();
-      const viewerSpace = await session.requestReferenceSpace("viewer");
-      const hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
-
-      renderer.setAnimationLoop(timestamp => {
-        if (renderer.xr.isPresenting) {
-          const frame = renderer.xr.getFrame();
-          const referenceSpace = renderer.xr.getReferenceSpace();
-          const hitTestResults = frame.getHitTestResults(hitTestSource);
-
-          if (hitTestResults.length > 0) {
-            const hit = hitTestResults[0];
-            const pose = hit.getPose(referenceSpace);
-            reticle.visible = true;
-            reticle.matrix.fromArray(pose.transform.matrix);
-          } else {
-            reticle.visible = false;
-          }
-        }
-        renderer.render(scene, camera);
-      });
-
-      resolve();
-    });
-  });
-
-  // Hammer.js gesture handling
-  const hammer = new Hammer(document.body);
-  hammer.get('pan').set({ direction: Hammer.DIRECTION_ALL });
-  hammer.get('pinch').set({ enable: true });
-  hammer.get('rotate').set({ enable: true });
-
-  let lastPan = { x: 0, y: 0 };
-  let lastRotation = 0;
-
-  hammer.on("panmove", ev => {
-    if (!currentModel) return;
-    const deltaX = ev.deltaX - lastPan.x;
-    const deltaY = ev.deltaY - lastPan.y;
-
-    currentModel.position.x += deltaX * 0.0005;
-    currentModel.position.z += deltaY * 0.0005;
-
-    lastPan = { x: ev.deltaX, y: ev.deltaY };
-  });
-
-  hammer.on("panend", () => {
-    lastPan = { x: 0, y: 0 };
-  });
-
-  hammer.on("pinchmove", ev => {
-    if (!currentModel) return;
-    currentModel.scale.setScalar(initialScale * ev.scale);
-  });
-
-  hammer.on("pinchend", ev => {
-    if (!currentModel) return;
-    initialScale = currentModel.scale.x;
-  });
-
-  hammer.on("rotatemove", ev => {
-    if (!currentModel) return;
-    currentModel.rotation.y += THREE.MathUtils.degToRad(ev.rotation - lastRotation);
-    lastRotation = ev.rotation;
-  });
-
-  hammer.on("rotateend", () => {
-    lastRotation = 0;
-  });
-
-  // Double tap to place model
-  hammer.on("doubletap", () => {
-    if (selectedModelUrl && reticle.visible && !isModelPlaced) {
-      loader.load(selectedModelUrl, gltf => {
-        model = gltf.scene;
-        model.position.setFromMatrixPosition(reticle.matrix);
-        model.quaternion.setFromRotationMatrix(reticle.matrix);
-        model.scale.set(0.5, 0.5, 0.5);
-
-        currentModel = model;
-        scene.add(model);
-        isModelPlaced = true;
-        initialScale = 0.5;
-      });
+  function onTouchStart(event) {
+    if (!selectedModel) return;
+    
+    event.preventDefault();
+    
+    const touches = event.touches;
+    
+    if (touches.length === 1) {
+      // Single touch - prepare for translation
+      touchStartPosition.set(touches[0].clientX, touches[0].clientY);
+      touchStartModelPosition.copy(selectedModel.position);
+      isTwoFingerTouch = false;
+      isThreeFingerTouch = false;
+    } 
+    else if (touches.length === 2) {
+      // Two touches - prepare for rotation/scale
+      isTwoFingerTouch = true;
+      isThreeFingerTouch = false;
+      
+      // Calculate initial distance between fingers (for scaling)
+      touchStartDistance = Math.hypot(
+        touches[0].clientX - touches[1].clientX,
+        touches[0].clientY - touches[1].clientY
+      );
+      
+      // Calculate initial angle (for rotation)
+      touchStartRotation = Math.atan2(
+        touches[1].clientY - touches[0].clientY,
+        touches[1].clientX - touches[0].clientX
+      );
+      
+      touchStartModelScale.copy(selectedModel.scale);
+      touchStartModelQuaternion.copy(selectedModel.quaternion);
     }
-  });
+    else if (touches.length === 3) {
+      // Three touches - prepare for translation in Y axis
+      isThreeFingerTouch = true;
+      touchStartPosition.set(touches[0].clientX, touches[0].clientY);
+      touchStartModelPosition.copy(selectedModel.position);
+    }
+  }
+
+  function onTouchMove(event) {
+    if (!selectedModel) return;
+    
+    event.preventDefault();
+    
+    const touches = event.touches;
+    
+    if (touches.length === 1 && !isTwoFingerTouch && !isThreeFingerTouch) {
+      // Single finger drag - translate in X/Z plane
+      const touchCurrentPosition = new THREE.Vector2(touches[0].clientX, touches[0].clientY);
+      const touchDelta = new THREE.Vector2().subVectors(touchCurrentPosition, touchStartPosition);
+      
+      // Convert screen delta to world movement (adjust sensitivity as needed)
+      const movementX = touchDelta.x * 0.01;
+      const movementZ = touchDelta.y * 0.01;
+      
+      // Move the model in X/Z plane (relative to camera)
+      const cameraDirection = new THREE.Vector3();
+      camera.getWorldDirection(cameraDirection);
+      cameraDirection.y = 0;
+      cameraDirection.normalize();
+      
+      const right = new THREE.Vector3();
+      right.crossVectors(new THREE.Vector3(0, 1, 0), cameraDirection).normalize();
+      
+      selectedModel.position.copy(touchStartModelPosition);
+      selectedModel.position.add(right.multiplyScalar(-movementX));
+      selectedModel.position.add(cameraDirection.multiplyScalar(movementZ));
+    }
+    else if (touches.length === 2 && isTwoFingerTouch) {
+      // Two finger gesture - rotate and scale
+      const currentDistance = Math.hypot(
+        touches[0].clientX - touches[1].clientX,
+        touches[0].clientY - touches[1].clientY
+      );
+      
+      const currentRotation = Math.atan2(
+        touches[1].clientY - touches[0].clientY,
+        touches[1].clientX - touches[0].clientX
+      );
+      
+      // Scale based on pinch gesture
+      const scaleFactor = currentDistance / touchStartDistance;
+      selectedModel.scale.set(
+        touchStartModelScale.x * scaleFactor,
+        touchStartModelScale.y * scaleFactor,
+        touchStartModelScale.z * scaleFactor
+      );
+      
+      // Rotate based on twist gesture
+      const rotationDelta = currentRotation - touchStartRotation;
+      selectedModel.quaternion.copy(touchStartModelQuaternion);
+      selectedModel.rotateY(rotationDelta);
+    }
+    else if (touches.length === 3 && isThreeFingerTouch) {
+      // Three finger drag - translate in Y axis
+      const touchCurrentPosition = new THREE.Vector2(touches[0].clientX, touches[0].clientY);
+      const touchDelta = touchStartPosition.y - touchCurrentPosition.y;
+      
+      // Move the model in Y axis
+      selectedModel.position.y = touchStartModelPosition.y + (touchDelta * 0.01);
+    }
+  }
+
+  function onTouchEnd(event) {
+    isTwoFingerTouch = false;
+    isThreeFingerTouch = false;
+  }
+
+  // ... (keep your existing animate() and render() functions)
+
+  return <div className="App"></div>;
 }
 
-function onSelect() {
-  // Disable default tap-to-place
-}
+export default App;
