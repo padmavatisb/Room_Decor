@@ -1,33 +1,26 @@
-import "./App.css";
-import * as THREE from "three";
-import { ARButton } from "three/examples/jsm/webxr/ARButton";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+import './App.css';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import { ARButton } from 'three/examples/jsm/webxr/ARButton';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
-let camera, scene, renderer;
-let controller;
-let reticle;
-let selectedModel = null;
-
-let touchStartDistance = 0;
-let initialScale = 1;
-let isScaling = false;
+let camera, scene, renderer, controller;
+let reticle, model = null;
+let selected = false;
+let startX = 0, startY = 0;
 let isDragging = false;
-let dragStart = new THREE.Vector2();
-let initialPosition = new THREE.Vector3();
+
+let previousTouches = [];
 
 init();
-animate();
 
 function init() {
-  const container = document.createElement("div");
+  const container = document.createElement('div');
   document.body.appendChild(container);
 
   scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
-  const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-  light.position.set(0.5, 1, 0.25);
-  scene.add(light);
+  camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(window.devicePixelRatio);
@@ -35,116 +28,138 @@ function init() {
   renderer.xr.enabled = true;
   container.appendChild(renderer.domElement);
 
-  document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
+  const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+  light.position.set(0.5, 1, 0.25);
+  scene.add(light);
 
-  const loader = new GLTFLoader();
-  loader.load("/chair.glb", (gltf) => {
-    selectedModel = gltf.scene;
-    selectedModel.visible = false; // Don't show until placement
-    scene.add(selectedModel);
-  });
-
-  const geometry = new THREE.RingGeometry(0.05, 0.06, 32).rotateX(-Math.PI / 2);
-  const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-  reticle = new THREE.Mesh(geometry, material);
+  // Reticle for AR plane detection
+  reticle = new THREE.Mesh(
+    new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ color: 0x00ff00 })
+  );
   reticle.matrixAutoUpdate = false;
   reticle.visible = false;
   scene.add(reticle);
 
-  controller = renderer.xr.getController(0);
-  scene.add(controller);
-
-  const session = renderer.xr.getSession();
-  session.addEventListener("select", onSelect);
-
-  const referenceSpace = renderer.xr.getReferenceSpace();
-  session.requestReferenceSpace("viewer").then((refSpace) => {
-    session.requestHitTestSource({ space: refSpace }).then((source) => {
-      renderer.setAnimationLoop(() => {
-        renderer.render(scene, camera);
-
-        const frame = renderer.xr.getFrame();
-        if (frame) {
-          const hitTestResults = frame.getHitTestResults(source);
-          if (hitTestResults.length) {
-            const hit = hitTestResults[0];
-            const pose = hit.getPose(referenceSpace);
-            reticle.visible = true;
-            reticle.matrix.fromArray(pose.transform.matrix);
-          } else {
-            reticle.visible = false;
-          }
-        }
-
-        // Apply drag/scale/rotate
-        if (isDragging && selectedModel) {
-          const deltaX = dragStart.x - touchMove.x;
-          const deltaY = dragStart.y - touchMove.y;
-          selectedModel.position.x = initialPosition.x - deltaX;
-          selectedModel.position.z = initialPosition.z + deltaY;
-        }
-
-        if (isScaling && selectedModel) {
-          const currentDist = getTouchDistance();
-          const scaleFactor = currentDist / touchStartDistance;
-          selectedModel.scale.setScalar(initialScale * scaleFactor);
-        }
-      });
-    });
+  // Load model
+  const loader = new GLTFLoader();
+  loader.load('./chair.glb', function (gltf) {
+    model = gltf.scene;
+    model.visible = false;
+    scene.add(model);
   });
 
-  window.addEventListener("touchstart", onTouchStart, false);
-  window.addEventListener("touchmove", onTouchMove, false);
-  window.addEventListener("touchend", onTouchEnd, false);
+  document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
+
+  const controller = renderer.xr.getController(0);
+  controller.addEventListener('select', onSelect);
+  scene.add(controller);
+
+  // Add event listeners
+  renderer.domElement.addEventListener('touchstart', onTouchStart, false);
+  renderer.domElement.addEventListener('touchmove', onTouchMove, false);
+  renderer.domElement.addEventListener('touchend', onTouchEnd, false);
+
+  renderer.setAnimationLoop(render);
 }
 
+// On screen tap, place the model
 function onSelect() {
-  if (reticle.visible && selectedModel) {
-    selectedModel.position.setFromMatrixPosition(reticle.matrix);
-    selectedModel.visible = true;
+  if (reticle.visible && model) {
+    model.position.setFromMatrixPosition(reticle.matrix);
+    model.visible = true;
   }
 }
 
+// Touch handlers
 function onTouchStart(event) {
-  if (!selectedModel || !selectedModel.visible) return;
+  if (!model || !model.visible) return;
 
   if (event.touches.length === 1) {
+    const touch = event.touches[0];
+    startX = touch.clientX;
+    startY = touch.clientY;
     isDragging = true;
-    dragStart.set(event.touches[0].clientX, event.touches[0].clientY);
-    initialPosition.copy(selectedModel.position);
+
+    // Check if tap is on model
+    const mouse = new THREE.Vector2(
+      (startX / window.innerWidth) * 2 - 1,
+      -(startY / window.innerHeight) * 2 + 1
+    );
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
+
+    const intersects = raycaster.intersectObject(model, true);
+    selected = intersects.length > 0;
   } else if (event.touches.length === 2) {
-    isScaling = true;
-    touchStartDistance = getTouchDistance(event);
-    initialScale = selectedModel.scale.x;
+    previousTouches = [...event.touches];
   }
 }
 
 function onTouchMove(event) {
-  if (isDragging && event.touches.length === 1) {
-    touchMove.set(event.touches[0].clientX, event.touches[0].clientY);
-  } else if (isScaling && event.touches.length === 2) {
-    const currentDist = getTouchDistance(event);
-    const scaleFactor = currentDist / touchStartDistance;
-    selectedModel.scale.setScalar(initialScale * scaleFactor);
+  if (!model || !model.visible) return;
+
+  if (event.touches.length === 1 && isDragging && selected) {
+    const touch = event.touches[0];
+    const deltaX = (touch.clientX - startX) / 200;
+    const deltaY = (touch.clientY - startY) / 200;
+
+    model.position.x += deltaX;
+    model.position.z += deltaY;
+
+    startX = touch.clientX;
+    startY = touch.clientY;
+  }
+
+  if (event.touches.length === 2 && previousTouches.length === 2) {
+    const [touch1, touch2] = event.touches;
+    const [prev1, prev2] = previousTouches;
+
+    // Rotate
+    const angle = Math.atan2(touch2.clientY - touch1.clientY, touch2.clientX - touch1.clientX);
+    const prevAngle = Math.atan2(prev2.clientY - prev1.clientY, prev2.clientX - prev1.clientX);
+    const angleDiff = angle - prevAngle;
+
+    model.rotation.y += angleDiff;
+
+    // Scale
+    const dist = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+    const prevDist = Math.hypot(prev2.clientX - prev1.clientX, prev2.clientY - prev1.clientY);
+    const scaleChange = dist / prevDist;
+
+    model.scale.multiplyScalar(scaleChange);
+    previousTouches = [...event.touches];
   }
 }
 
 function onTouchEnd(event) {
   isDragging = false;
-  isScaling = false;
+  selected = false;
+  previousTouches = [];
 }
 
-function getTouchDistance(event) {
-  if (event.touches.length < 2) return 0;
-  const dx = event.touches[0].clientX - event.touches[1].clientX;
-  const dy = event.touches[0].clientY - event.touches[1].clientY;
-  return Math.sqrt(dx * dx + dy * dy);
-}
+function render(timestamp, frame) {
+  if (frame) {
+    const referenceSpace = renderer.xr.getReferenceSpace();
+    const session = renderer.xr.getSession();
 
-function animate() {
-  renderer.setAnimationLoop(() => {
-    renderer.render(scene, camera);
-  });
-}
+    const viewerPose = frame.getViewerPose(referenceSpace);
 
-const touchMove = new THREE.Vector2();
+    if (viewerPose) {
+      const hitTestResults = frame.getHitTestResults(renderer.xr.getController(0).inputSource);
+
+      if (hitTestResults.length > 0) {
+        const hit = hitTestResults[0];
+        const hitPose = hit.getPose(referenceSpace);
+
+        reticle.visible = true;
+        reticle.matrix.fromArray(hitPose.transform.matrix);
+      } else {
+        reticle.visible = false;
+      }
+    }
+  }
+
+  renderer.render(scene, camera);
+}
