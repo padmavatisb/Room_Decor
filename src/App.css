@@ -88,20 +88,29 @@
   font-size: 14px;
   line-height: 1.6;
 }
-body, html {
+body {
   margin: 0;
-  padding: 0;
   overflow: hidden;
-  touch-action: none; /* Prevent default scrolling/pinch zoom */
+  touch-action: none;
+  font-family: sans-serif;
+}
+
+.controls {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 10;
+}
+
+button.furniture {
+  margin: 4px;
+  padding: 10px;
+  font-size: 16px;
 }
 
 canvas {
-  display: block;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  touch-action: none; /* Important for WebXR gestures */
+  touch-action: none;
+  user-select: none;
 }
+
 
