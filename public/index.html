@@ -55,21 +55,39 @@
       <img class="button-image" id="item7" src="standing_lamp.png" />
       <img class="button-image" id="item8" src="little_bookcase.png" />
       <img class="button-image" id="item9" src="dining_set.png" />    
-         <!-- ✅ Added iframe at the correct place -->
+    </div>
+ <!-- ✅ Toggle buttons and iframes -->
+    <div style="text-align: center; margin: 20px 0;">
+      <button onclick="showViewer()">Show VR Viewer</button>
+      <button onclick="showControls()">Show UI Controls</button>
+    </div>
+
     <iframe
+      id="viewerFrame"
       src="https://vr-viewer.netlify.app"
       width="100%"
-      height="800px"
-      style="border: none"
+      height="600px"
+      style="border: none; display: block;"
     ></iframe>
-      <!-- Second iframe for vr-controls -->
-<iframe
-  src="https://vr-controls.netlify.app"
-  width="100%"
-  height="400px"
-  style="border: none"
-></iframe>
-    
 
+    <iframe
+      id="controlsFrame"
+      src="https://vr-controls.netlify.app"
+      width="100%"
+      height="600px"
+      style="border: none; display: none;"
+    ></iframe>
+
+    <script>
+      function showViewer() {
+        document.getElementById("viewerFrame").style.display = "block";
+        document.getElementById("controlsFrame").style.display = "none";
+      }
+
+      function showControls() {
+        document.getElementById("viewerFrame").style.display = "none";
+        document.getElementById("controlsFrame").style.display = "block";
+      }
+    </script>
   </body>
 </html>
