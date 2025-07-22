@@ -195,6 +195,57 @@ function App() {
       placeNewModelAtReticle();
     }
   }
+  function onSelect(event) {
+  const session = renderer.xr.getSession();
+  const viewerPose = event.frame.getViewerPose(renderer.xr.getReferenceSpace());
+
+  if (!viewerPose) return;
+
+  const raycaster = new THREE.Raycaster();
+  const screenPos = new THREE.Vector2(0, 0); // center of screen (controller ray)
+
+  raycaster.setFromCamera(screenPos, camera);
+  const intersects = raycaster.intersectObjects(scene.children, true);
+
+  for (let i = 0; i < intersects.length; i++) {
+    const obj = intersects[i].object;
+
+    // Check if user tapped on an inserted model
+    if (obj.parent && obj.parent.userData.isModel) {
+      selectedModel = obj.parent;
+      transformControl.attach(selectedModel);
+
+      // Show TRS menu
+      document.getElementById("mode-menu").classList.remove("hidden");
+      return; // Don't add a new model
+    }
+  }
+
+  // No model was tapped, so insert new model
+  if (reticle.visible) {
+    let newModel = items[itemSelectedIndex].clone();
+    newModel.visible = true;
+
+    reticle.matrix.decompose(
+      newModel.position,
+      newModel.quaternion,
+      newModel.scale
+    );
+
+    let scaleFactor = modelScaleFactor[itemSelectedIndex];
+    newModel.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+    newModel.userData.isModel = true; // mark it as tappable model
+
+    scene.add(newModel);
+    selectedModel = newModel;
+    transformControl.attach(selectedModel);
+
+    // Show TRS menu when added
+    document.getElementById("mode-menu").classList.remove("hidden");
+  }
+}
+
 
   function placeNewModelAtReticle() {
     let base = items[itemSelectedIndex];
