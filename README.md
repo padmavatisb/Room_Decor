@@ -3,6 +3,24 @@
   <img src="./.github/app.gif" alt="ROOM Decor" />
 
 <a href="https://roomdecor-arpadmavati.netlify.app/">Demo</a>
+## :checkered_flag: Starting
+
+You can try both AR demos directly using the buttons below:
+
+- 🔄 **Translate + Scale Demo**: [Click here](https://687e34fd82242c00085b25c7--roomdecor-padmavati.netlify.app/)
+- 🔁 **Rotate + Scale Demo**: [Click here](https://687e378399c05a0008faa581--roomdecor-padmavati.netlify.app/)
+
+---
+
+1. Using your phone, go to the live website at: https://padmavatisb.github.io/AR_RoomDecor/
+2. See the `Enter AR` button at the bottom of the screen and click it
+3. Allow phone permissions to use the camera
+4. See the row of furniture selections in the bottom banner that is horizontally scrollable. When you click the furniture thumbnail, a white border appears around your selection
+5. Pan your phone and walk around and see that a white ring reticle appears to show where you can place your furniture selection
+6. In your phone, white the white ring reticle present, tap the phone screen and see your furniture selection appear in place of the reticle
+7. You can switch furniture selections and continue walking around and placing furniture
+8. See that as you walk around and pan your phone, you are able to walk around the furniture and view it in 3D in real-time
+9. Clik `Stop AR` to exit the experience
 
 
 </div>
