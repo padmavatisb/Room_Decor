@@ -1,109 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Room_Decor - AR Room Decor</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      margin: 40px;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.6;
+      color: #24292e;
+      background: #ffffff;
+    }
 
-# Room_Decor
-<div align="center" id="top"> 
-  <img src="./.github/app.gif" alt="ROOM Decor" />
+    a {
+      color: #0366d6;
+      text-decoration: none;
+    }
 
-<!---<a href="https://roomdecor-arpadmavati.netlify.app/">Demo</a>--->
+    a:hover {
+      text-decoration: underline;
+    }
 
+    h1, h2, h3 {
+      border-bottom: 1px solid #eaecef;
+      padding-bottom: 0.3em;
+    }
 
-<h1 align="center">AR Room Decor </h1>
-  <a href="https://687e34fd82242c00085b25c7--roomdecor-padmavati.netlify.app/" target="_blank" class="btn">
+    .btn {
+      display: inline-block;
+      margin: 10px 0;
+      padding: 10px 18px;
+      background-color: #0366d6;
+      color: white;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 16px;
+    }
+
+    .btn:hover {
+      background-color: #024baf;
+    }
+
+    img {
+      max-width: 100%;
+    }
+
+    @media (max-width: 600px) {
+      body {
+        margin: 20px;
+        font-size: 16px;
+      }
+
+      .btn {
+        display: block;
+        width: 100%;
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Room_Decor</h1>
+
+  <div align="center">
+    <img src="./.github/app.gif" alt="ROOM Decor" />
+    
+    <h2>AR Room Decor</h2>
+
+    <a href="https://687e34fd82242c00085b25c7--roomdecor-padmavati.netlify.app/" target="_blank" class="btn">
       🔄 Translate + Scale Demo
-    </a> <br>
+    </a><br>
     <a href="https://687e378399c05a0008faa581--roomdecor-padmavati.netlify.app/" target="_blank" class="btn">
       🔁 Rotate + Scale Demo
     </a>
-</div>
+  </div>
 
-<p align="center">
+  <p align="center">
+    <a href="#about">About</a> |
+    <a href="#features">Features</a> |
+    <a href="#technologies">Technologies</a> |
+    <a href="#requirements">Requirements</a> |
+    <a href="#starting">Starting</a> |
+    <a href="#license">License</a> |
+    <a href="https://github.com/padmavatisb" target="_blank">Author</a>
+  </p>
 
-  <!-- <img alt="Github issues" src="https://img.shields.io/github/issues/{{YOUR_GITHUB_USERNAME}}/3d-webxr-furniture?color=56BEB8" /> -->
+  <h3 id="about">🎯 About</h3>
+  <p>
+    Use augmented reality (AR) to pick and place a selection of furniture models into your surroundings in real-time using your mobile's live video footage. This project uses ThreeJS for rendering, WebXR for AR mode, hit testing, environment lighting, and DOM overlay for UI.
+  </p>
+  <p>
+    View the live demo on your mobile: <a href="https://padmavatisb.github.io/AR_RoomDecor/" target="_blank">https://padmavatisb.github.io/AR_RoomDecor/</a>
+  </p>
 
-  <!-- <img alt="Github forks" src="https://img.shields.io/github/forks/{{YOUR_GITHUB_USERNAME}}/3d-webxr-furniture?color=56BEB8" /> -->
+  <h3 id="starting">🏁 Starting</h3>
+  <ol>
+    <li>Open: <a href="https://padmavatisb.github.io/AR_RoomDecor/" target="_blank">AR_RoomDecor</a></li>
+    <li>Click the “Enter AR” button</li>
+    <li>Allow camera access</li>
+    <li>Select a furniture item from the scrollable list</li>
+    <li>Pan phone to find placement reticle</li>
+    <li>Tap screen to place model</li>
+    <li>Walk around to view it in 3D</li>
+    <li>Tap “Stop AR” to exit</li>
+  </ol>
 
-  <!-- <img alt="Github stars" src="https://img.shields.io/github/stars/{{YOUR_GITHUB_USERNAME}}/3d-webxr-furniture?color=56BEB8" /> -->
-</p>
+  <h3 id="features">✨ Features</h3>
+  <ul>
+    <li>✔️ Hit Testing</li>
+    <li>✔️ Real-Time Lighting</li>
+    <li>✔️ Augmented Reality with WebXR</li>
+    <li>✔️ Realistic 3D Textured Models</li>
+    <li>✔️ Scrollable Model Selector</li>
+    <li>✔️ DOM Overlay Support</li>
+  </ul>
 
-<!-- Status -->
+  <h3 id="technologies">🚀 Technologies</h3>
+  <ul>
+    <li>ThreeJS</li>
+    <li>Node.js</li>
+    <li>TypeScript</li>
+  </ul>
 
-<!-- <h4 align="center">
-	🚧  3d Webxr Furniture 🚀 Under construction...  🚧
-</h4>
+  <h3 id="requirements">✅ Requirements</h3>
+  <ul>
+    <li>Git</li>
+    <li>Node.js</li>
+  </ul>
 
-<hr> -->
-
-<p align="center">
-  <a href="#dart-about">About</a> &#xa0; | &#xa0; 
-  <a href="#sparkles-features">Features</a> &#xa0; | &#xa0;
-  <a href="#rocket-technologies">Technologies</a> &#xa0; | &#xa0;
-  <a href="#white_check_mark-requirements">Requirements</a> &#xa0; | &#xa0;
-  <a href="#checkered_flag-starting">Starting</a> &#xa0; | &#xa0;
-  <a href="#memo-license">License</a> &#xa0; | &#xa0;
-  <a href="https://github.com/padmavatisb" target="_blank">Author</a>
-</p>
-
-<br>
-
-## :dart: About
-
-Use augmented reality (AR) to pick and place a selection of furniture models into your surroundings in real-time using your mobile's live video footage of your current surroundings. This project leverages ThreeJS to render the scene and furniture models, WebXR to enable AR mode with estimated real-time environment lighting, hit testing for furniture placement on the floor, and dom-overlay to render the UI.
-
-View the live demo on your mobile at: https://padmavatisb.github.io/AR_RoomDecor/
-
-
-## :checkered_flag: Starting
-
-1. Using your phone, go to the live website at: https://padmavatisb.github.io/AR_RoomDecor/
-2. See the `Enter AR` button at the bottom of the screen and click it
-3. Allow phone permissions to use the camera
-4. See the row of furniture selections in the bottom banner that is horizontally scrollable. When you click the furniture thumbnail, a white border appears around your selection
-5. Pan your phone and walk around and see that a white ring reticle appears to show where you can place your furniture selection
-6. In your phone, white the white ring reticle present, tap the phone screen and see your furniture selection appear in place of the reticle
-7. You can switch furniture selections and continue walking around and placing furniture
-8. See that as you walk around and pan your phone, you are able to walk around the furniture and view it in 3D in real-time
-9. Clik `Stop AR` to exit the experience
-
-## :sparkles: Features
-
-:heavy_check_mark: Hit Testing\
-:heavy_check_mark: Real-Time Environment Light Estimation\
-:heavy_check_mark: Augmented Reality with WebXR\
-:heavy_check_mark: Realistic 3D Models with Textures\
-:heavy_check_mark: Horizontally Scrollable Furniture Selection\
-:heavy_check_mark: Dom-Overlay
-
-## :rocket: Technologies
-
-The following tools were used in this project:
-
-- [ThreeJS](https://threejs.org/)
-- [Node.js](https://nodejs.org/en/)
-- [TypeScript](https://immersiveweb.dev/)
-
-## :white_check_mark: Requirements
-
-Before starting :checkered_flag:, you need to have [Git](https://git-scm.com) and [Node](https://nodejs.org/en/) installed.
-
-## :checkered_flag: Starting
-
-```bash
+  <h3 id="starting">📦 Getting Started</h3>
+  <pre><code>
 # Clone this project
-$ git clone [https://padmavatisb.github.io/AR_RoomDecor/]
+$ git clone https://github.com/padmavatisb/AR_RoomDecor.git
 
 # Access
-$ cd AR RoomDecor
+$ cd AR_RoomDecor
 
 # Install dependencies
 $ npm install
 
 # Run the project
 $ npm run
+# or
 $ npm start
 
-# The server will initialize in the <http://localhost:3000>.
+# Open http://localhost:3000
+  </code></pre>
 
-
-
-
-
-<a href="#top">Back to top</a>
+  <p><a href="#top">🔝 Back to top</a></p>
+</body>
+</html>
