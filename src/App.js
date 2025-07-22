@@ -55,7 +55,6 @@ function App() {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.xr.enabled = true;
 
-    // Fallback Lights (when AR light estimation is not available)
     fallbackLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
     fallbackLight.position.set(0, 1, 0);
     scene.add(fallbackLight);
@@ -65,7 +64,6 @@ function App() {
     directionalLight.castShadow = true;
     scene.add(directionalLight);
 
-    // Light Estimation Setup
     xrLight = new XREstimatedLight(renderer);
     xrLight.addEventListener("estimationstart", () => {
       scene.add(xrLight);
@@ -87,7 +85,6 @@ function App() {
       scene.environment = null;
     });
 
-    // AR Button
     const arButton = ARButton.createButton(renderer, {
       requiredFeatures: ["hit-test"],
       optionalFeatures: ["light-estimation", "dom-overlay"],
@@ -96,14 +93,12 @@ function App() {
     arButton.style.bottom = "20%";
     document.body.appendChild(arButton);
 
-    // Transform Controls
     transformControl = new TransformControls(camera, renderer.domElement);
     transformControl.addEventListener("dragging-changed", (event) => {
       renderer.xr.enabled = !event.value;
     });
     scene.add(transformControl);
 
-    // Load Models
     for (let i = 0; i < models.length; i++) {
       const loader = new GLTFLoader();
       loader.load(models[i], function (glb) {
@@ -122,7 +117,6 @@ function App() {
     controller.addEventListener("select", onSelect);
     scene.add(controller);
 
-    // Reticle
     reticle = new THREE.Mesh(
       new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
       new THREE.MeshBasicMaterial({ color: 0x00ff00 })
@@ -131,7 +125,6 @@ function App() {
     reticle.visible = false;
     scene.add(reticle);
 
-    // Transform Gizmo Keyboard Shortcuts
     window.addEventListener("keydown", (e) => {
       switch (e.key.toLowerCase()) {
         case "t":
@@ -145,6 +138,70 @@ function App() {
           break;
       }
     });
+
+    // ✅✅✅ Android Gesture Support Begins Here
+    let isDragging = false;
+    let initialTouch = null;
+    let initialScaleDistance = null;
+    let initialRotationAngle = null;
+
+    myCanvas.addEventListener("touchstart", (event) => {
+      if (!selectedModel) return;
+
+      if (event.touches.length === 1) {
+        initialTouch = event.touches[0];
+        isDragging = true;
+      } else if (event.touches.length === 2) {
+        initialScaleDistance = getTouchDistance(event.touches);
+        initialRotationAngle = getTouchAngle(event.touches);
+      }
+    });
+
+    myCanvas.addEventListener("touchmove", (event) => {
+      if (!selectedModel) return;
+
+      if (event.touches.length === 1 && isDragging) {
+        const dx = (event.touches[0].clientX - initialTouch.clientX) * 0.001;
+        const dz = (event.touches[0].clientY - initialTouch.clientY) * 0.001;
+        selectedModel.position.x += dx;
+        selectedModel.position.z += dz;
+        initialTouch = event.touches[0];
+      } else if (event.touches.length === 2) {
+        const newDistance = getTouchDistance(event.touches);
+        const scaleChange = newDistance / initialScaleDistance;
+        selectedModel.scale.multiplyScalar(scaleChange);
+        initialScaleDistance = newDistance;
+
+        const newAngle = getTouchAngle(event.touches);
+        const angleChange = newAngle - initialRotationAngle;
+        selectedModel.rotation.y += angleChange;
+        initialRotationAngle = newAngle;
+      }
+    });
+
+    myCanvas.addEventListener("touchend", (event) => {
+      if (event.touches.length < 2) {
+        initialScaleDistance = null;
+        initialRotationAngle = null;
+      }
+      if (event.touches.length === 0) {
+        isDragging = false;
+        initialTouch = null;
+      }
+    });
+
+    function getTouchDistance(touches) {
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function getTouchAngle(touches) {
+      const dx = touches[1].clientX - touches[0].clientX;
+      const dy = touches[1].clientY - touches[0].clientY;
+      return Math.atan2(dy, dx);
+    }
+    // ✅✅✅ Android Gesture Support Ends Here
   }
 
   function onSelect() {
