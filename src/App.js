@@ -5,6 +5,23 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { XREstimatedLight } from "three/examples/jsm/webxr/XREstimatedLight";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls";
 
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls';
+
+// Inside your setup code:
+const transformControls = new TransformControls(camera, renderer.domElement);
+scene.add(transformControls);
+
+// When user taps on a model
+transformControls.attach(selectedModel);
+
+// Set mode from dropdown
+transformControls.setMode("translate"); // or "rotate" or "scale"
+
+// Optional: to avoid conflict with OrbitControls
+transformControls.addEventListener('dragging-changed', function (event) {
+    orbitControls.enabled = !event.value;
+});
+
 function App() {
   let reticle;
   let hitTestSource = null;
