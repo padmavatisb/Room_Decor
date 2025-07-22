@@ -2,16 +2,17 @@
 <div align="center" id="top"> 
   <img src="./.github/app.gif" alt="ROOM Decor" />
 
-<a href="https://roomdecor-arpadmavati.netlify.app/">Demo</a>
-</div>
+<!---<a href="https://roomdecor-arpadmavati.netlify.app/">Demo</a>--->
+
 
 <h1 align="center">AR Room Decor </h1>
   <a href="https://687e34fd82242c00085b25c7--roomdecor-padmavati.netlify.app/" target="_blank" class="btn">
       🔄 Translate + Scale Demo
-    </a>
+    </a> <br>
     <a href="https://687e378399c05a0008faa581--roomdecor-padmavati.netlify.app/" target="_blank" class="btn">
       🔁 Rotate + Scale Demo
     </a>
+</div>
 
 <p align="center">
 
