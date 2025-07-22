@@ -63,6 +63,10 @@
   border: 2px solid #00ffff;
   background-color: #333;
 }
+canvas {
+  touch-action: none;
+}
+
 
 /* Control button container (e.g., for model selection) */
 .button-container {
