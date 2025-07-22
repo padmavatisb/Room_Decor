@@ -3,6 +3,9 @@
   <img src="./.github/app.gif" alt="ROOM Decor" />
 
 <a href="https://roomdecor-arpadmavati.netlify.app/">Demo</a>
+</div>
+
+<h1 align="center">AR Room Decor </h1>
 ## :checkered_flag: Starting
 
 You can try both AR demos directly using the buttons below:
@@ -21,11 +24,6 @@ You can try both AR demos directly using the buttons below:
 7. You can switch furniture selections and continue walking around and placing furniture
 8. See that as you walk around and pan your phone, you are able to walk around the furniture and view it in 3D in real-time
 9. Clik `Stop AR` to exit the experience
-
-
-</div>
-
-<h1 align="center">AR Room Decor </h1>
 
 <p align="center">
 
