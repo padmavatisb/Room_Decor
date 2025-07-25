@@ -1,5 +1,6 @@
-# Room_Decor
+
 <div align="center" id="top"> 
+	<h1>Room Decor</h1>
   <img src="./.github/app.gif" alt="ROOM Decor" />
 
 <!---<a href="https://roomdecor-arpadmavati.netlify.app/">Demo</a>
@@ -31,7 +32,6 @@
   <a href="#rocket-technologies">Technologies</a> &#xa0; | &#xa0;
   <a href="#white_check_mark-requirements">Requirements</a> &#xa0; | &#xa0;
   <a href="#checkered_flag-starting">Starting</a> &#xa0; | &#xa0;
- 
   <a href="https://github.com/padmavatisb" target="_blank">Author</a>
 </p>
 
